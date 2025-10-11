@@ -1,4 +1,4 @@
-module spi #(
+module SLAVE #(
     parameter IDLE = 3'b000, 
     parameter CHK_CMD = 3'b001, 
     parameter WRITE = 3'b010, 

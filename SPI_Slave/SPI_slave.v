@@ -1,130 +1,137 @@
-module SLAVE (MOSI,MISO,SS_n,clk,rst_n,rx_data,rx_valid,tx_data,tx_valid);
+module SLAVE #(
+    parameter IDLE = 3'b000, 
+    parameter CHK_CMD = 3'b001, 
+    parameter WRITE = 3'b010, 
+    parameter READ_ADD = 3'b011, 
+    parameter READ_DATA = 3'b100
+)(
+    input MOSI, SS_n, clk, rst_n,
+    input tx_valid,
+    input [7:0] tx_data,
+    output reg rx_valid,
+    output reg [9:0] rx_data,
+    output reg MISO
 
-localparam IDLE      = 3'b000;
-localparam WRITE     = 3'b001;
-localparam CHK_CMD   = 3'b010;
-localparam READ_ADD  = 3'b011;
-localparam READ_DATA = 3'b100;
-
-input            MOSI, clk, rst_n, SS_n, tx_valid;
-input      [7:0] tx_data;
-output reg [9:0] rx_data;
-output reg       rx_valid, MISO;
-
-reg [3:0] counter;
-reg       received_address;
+);
 
 reg [2:0] cs, ns;
+reg add_exist;
+reg [3:0] counter_in;
+reg [2:0] counter_out;
+reg [7:0] tx_reg;
+reg start_out;
 
-always @(posedge clk) begin
-    if (~rst_n) begin
-        cs <= IDLE;
-    end
-    else begin
+// State memory
+always @(posedge clk ) begin
+    if(!rst_n)  
+       cs <= IDLE;
+    else 
         cs <= ns;
-    end
 end
 
-always @(*) begin
+// Next state logic
+always @(*) begin 
     case (cs)
-        IDLE : begin
-            if (SS_n)
+        IDLE: ns = (SS_n == 0) ? CHK_CMD : IDLE;
+        
+        CHK_CMD: begin
+            if (SS_n == 1) 
                 ns = IDLE;
-            else
-                ns = CHK_CMD;
-        end
-        CHK_CMD : begin
-            if (SS_n)
-                ns = IDLE;
-            else begin
-                if (~MOSI)
-                    ns = WRITE;
-                else begin
-                    if (received_address) 
-                        ns = READ_ADD; 
-                    else
-                        ns = READ_DATA;
-                end
-            end
-        end
-        WRITE : begin
-            if (SS_n)
-                ns = IDLE;
-            else
+            else if (MOSI == 0)
                 ns = WRITE;
-        end
-        READ_ADD : begin
-            if (SS_n)
-                ns = IDLE;
             else
-                ns = READ_ADD;
+                ns = (add_exist) ? READ_DATA : READ_ADD;
         end
-        READ_DATA : begin
-            if (SS_n)
-                ns = IDLE;
-            else
-                ns = READ_DATA;
-        end
-    endcase
-end
 
-always @(posedge clk) begin
-    if (~rst_n) begin 
-        rx_data <= 0;
+        WRITE: ns = (SS_n == 1) ? IDLE : WRITE;
+        READ_ADD: ns = (SS_n == 1) ? IDLE : READ_ADD;
+        READ_DATA: ns = (SS_n == 1) ? IDLE : READ_DATA;
+        default: ns = IDLE;
+    endcase 
+end 
+
+// Output logic and counters
+always @(posedge clk ) begin 
+    if (!rst_n) begin
+        add_exist <= 0;
+        counter_in <= 4'b0;
+        counter_out <= 3'b0;
         rx_valid <= 0;
-        received_address <= 0;
+        rx_data <= 10'b0;
         MISO <= 0;
+       
+        start_out <= 0;
+        tx_reg <= 8'b0;
     end
     else begin
-        case (cs)
-            IDLE : begin
-                rx_valid <= 0;
-            end
-            CHK_CMD : begin
-                counter <= 10;      
-            end
-            WRITE : begin
-                if (counter > 0) begin
-                    rx_data[counter-1] <= MOSI;
-                    counter <= counter - 1;
+        // Default assignments
+        rx_valid <= 0;   // to set rx_valid to zero every clk cycle even it was high previous to sample data correctly and dosnt coreept with another mosi
+       
+        
+        if (SS_n) begin
+            counter_in <= 4'b0;
+            counter_out <= 3'b0;
+            start_out <= 0;
+        end
+        else begin
+                
+            case (cs)
+                IDLE: begin
+                    counter_in <= 0;
+                    counter_out <= 0;
                 end
-                else begin
-                    rx_valid <= 1;
-                end
-            end
-            READ_ADD : begin
-                if (counter > 0) begin
-                    rx_data[counter-1] <= MOSI;
-                    counter <= counter - 1;
-                end
-                else begin
-                    rx_valid <= 1;
-                    received_address <= 1;
-                end
-            end
-            READ_DATA : begin
-                if (tx_valid) begin
-                    rx_valid <= 0;
-                    if (counter > 0) begin
-                        MISO <= tx_data[counter-1];
-                        counter <= counter - 1;
+                
+                
+                WRITE :begin 
+                 if (counter_in < 10) begin
+                   rx_data <= {rx_data[8:0], MOSI};
+                  counter_in <= counter_in + 1;
                     end
-                    else begin
-                        received_address <= 0;
-                    end
+                        
+                 if (counter_in == 9)
+                            rx_valid <= 1;
                 end
-                else begin
-                    if (counter > 0) begin
-                        rx_data[counter-1] <= MOSI;
-                        counter <= counter - 1;
+                READ_ADD: begin
+                   if (counter_in < 10) begin // excute 10 time 
+                   rx_data <= {rx_data[8:0], MOSI};
+                  counter_in <= counter_in + 1;
                     end
-                    else begin
-                        rx_valid <= 1;
-                        counter <= 8;
-                    end
+                        
+                 if (counter_in == 9)   // at 10th time 
+                            rx_valid <= 1;
+                 add_exist <= 1 ;
+                    
                 end
+                 READ_DATA : begin
+                 if (counter_in < 10) begin
+                   rx_data <= {rx_data[8:0], MOSI};
+                  counter_in <= counter_in + 1;
+                    end
+                        
+                 if (counter_in == 9)
+                            rx_valid <= 1;
+                 add_exist = 0 ;
+                      
+                 if ( tx_valid  ) begin
+                        tx_reg <= tx_data;    // save inside spi 
+                        start_out <= 1;
+                    end
+                 end
+                
+            endcase
+            
+            
+            // MISO handling
+            if (start_out && (counter_out < 8)) begin
+                MISO <= tx_reg[7-counter_out];
+                counter_out <= counter_out + 1;
             end
-        endcase
+            else if (counter_out >= 8 ) begin
+                start_out <= 0;
+            end
+        end
+        
+
     end
 end
 
