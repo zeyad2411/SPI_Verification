@@ -6,4 +6,5 @@ localparam CHK_CMD   = 3'b010;
 localparam READ_ADD  = 3'b011;
 localparam READ_DATA = 3'b100;
 
+bit [10:0] global_MOSI_rand;
 endpackage
