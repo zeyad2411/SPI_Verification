@@ -71,18 +71,6 @@ QuestaSim-64 vlog 2021.1 Compiler 2021.01 Jan 19 2021
 Top level modules:
 	--none--
 
-} {} {}} C:/Users/User/Documents/My-Github/SPI_Verification/SPI_Slave/SPI_Slave_monitor.sv {1 {vlog -work work -vopt -sv -stats=none C:/Users/User/Documents/My-Github/SPI_Verification/SPI_Slave/SPI_Slave_monitor.sv
-QuestaSim-64 vlog 2021.1 Compiler 2021.01 Jan 19 2021
--- Compiling package SPI_Slave_monitor_pkg
--- Importing package mtiUvm.uvm_pkg (uvm-1.1d Built-in)
--- Importing package shared_pkg
--- Importing package SPI_Slave_config_pkg
--- Importing package SPI_Slave_seq_item_pkg
-** Note: (vlog-2286) C:/Users/User/Documents/My-Github/SPI_Verification/SPI_Slave/SPI_Slave_monitor.sv(6): Using implicit +incdir+C:/questasim64_2021.1/uvm-1.1d/../verilog_src/uvm-1.1d/src from import uvm_pkg
-
-Top level modules:
-	--none--
-
 } {} {}} C:/Users/User/Documents/My-Github/SPI_Verification/SPI_Slave/SPI_Slave_env.sv {1 {vlog -work work -vopt -sv -stats=none C:/Users/User/Documents/My-Github/SPI_Verification/SPI_Slave/SPI_Slave_env.sv
 QuestaSim-64 vlog 2021.1 Compiler 2021.01 Jan 19 2021
 -- Compiling package SPI_Slave_env_pkg

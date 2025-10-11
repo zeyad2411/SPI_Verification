@@ -72,6 +72,7 @@ always @(posedge clk ) begin
             counter_in <= 4'b0;
             counter_out <= 3'b0;
             start_out <= 0;
+            rx_data <= 10'b0;
         end
         else begin
                 

@@ -77,12 +77,12 @@ CP4_miso_inactive_cover: cover property (
 AP5_rx_data_stable_when_idle_assert: assert property (
     @(posedge clk) disable iff (!rst_n)
     // When SS_n is high (slave is idle), the rx_data bus should not change
-    (SS_n) |-> $stable(rx_data)
+    (SS_n && $past(SS_n)) |=> $stable(rx_data)
 ) else $error("rx_data Signal Integrity Failed: Data changed while slave was idle (SS_n high).");
 
 CP5_rx_data_stable_when_idle_cover: cover property (
     @(posedge clk) disable iff (!rst_n)
-    (SS_n) |-> $stable(rx_data)
+    (SS_n && $past(SS_n)) |=> $stable(rx_data)
 );
 
 //----------------------------------------------------------------------
