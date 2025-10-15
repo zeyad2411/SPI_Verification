@@ -2,6 +2,8 @@ shared_pkg.sv
 SPI_Slave_if.sv
 SPI_Slave.v 
 SPI_Slave_SVA.sv
+spi_gm_if.sv
+SPI_GM.v
 
 SPI_Slave_seq_item.sv
 SPI_Slave_config.sv

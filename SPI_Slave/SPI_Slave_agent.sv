@@ -37,6 +37,7 @@ class SPI_Slave_agent extends uvm_agent;
     function void connect_phase(uvm_phase phase);
         super.connect_phase(phase);
         mon.SPI_Slave_vif = SPI_Slave_cfg.SPI_Slave_vif;
+        mon.SPI_gm_vif = SPI_Slave_cfg.SPI_gm_vif;
         mon.mon_ap.connect(agt_ap);
         
         if (SPI_Slave_cfg.is_active == UVM_ACTIVE) begin

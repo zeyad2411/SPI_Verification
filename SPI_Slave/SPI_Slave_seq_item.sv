@@ -7,29 +7,41 @@ package SPI_Slave_seq_item_pkg;
     `uvm_object_utils(SPI_Slave_seq_item)
 
     // ============================================
+    // GM signals
+    // ============================================
+     logic [9:0] rx_data_gm;
+     logic rx_valid_gm, MISO_gm;
+     logic [2:0] cs_sva_gm;
+
+
+
+
+    // ============================================
     // DUT signals
     // ============================================
-    logic MOSI;
-    rand logic       rst_n, SS_n, tx_valid;
-    rand logic [7:0] tx_data;
+    logic MOSI = 0;
+    rand logic       rst_n;
+    rand logic   SS_n, tx_valid;
+    logic [7:0] tx_data;
+    
 
     // DUT outputs (for monitor use)
     logic [9:0] rx_data;
     logic       rx_valid;
     logic       MISO;
+    logic [2:0] cs_sva;
 
     // ============================================
     // Internal randomization control
     // ============================================
     rand logic [10:0] mosi_bits;  // full serial frame (11 bits)
-    rand bit is_read_data;        // used to control tx_valid logic
 
     // Global (shared) variables for frame control
-    static int global_cycle_count = 0;
+    
     static int bit_counter = 0;
     static logic [10:0] current_mosi_bits; // current active command frame
-    static int current_period;
-    static bit current_is_read_data;
+    static int frame_counter = 0;
+    static int frame_period  = 13;
 
     // ============================================
     // Constructor
@@ -50,20 +62,15 @@ package SPI_Slave_seq_item_pkg;
     // (2) Valid MOSI command combinations (first 3 bits)
     // Commands: 000=WRITE_ADD, 001=reserved, 110=READ_ADD, 111=READ_DATA
     constraint valid_cmd_c {
+      !(mosi_bits[10:8] inside {3'b100 ,3'b010 ,3'b011 ,3'b101 }) ;
       mosi_bits[10:8] inside {3'b000, 3'b001, 3'b110, 3'b111};
     }
 
-    // (3) Define read_data flag for tx_valid control
-    constraint read_data_flag_c {
-      if (mosi_bits[10:8] == 3'b111)
-        is_read_data == 1;
-      else
-        is_read_data == 0;
-    }
+    
 
     // (4) tx_valid high only during READ_DATA operations
     constraint tx_valid_c {
-      if (is_read_data)
+      if (mosi_bits[10:8] == 3'b111)
         tx_valid == 1;
       else
         tx_valid == 0;
@@ -74,59 +81,67 @@ package SPI_Slave_seq_item_pkg;
     // ============================================
     function void post_randomize();
 
+      if (!rst_n) begin
+        // During reset, force outputs low and idle inputs
+        MOSI     = 0;
+        SS_n     = 1;  // inactive
+        tx_valid = 0;
+        tx_data  = 0;
+        bit_counter = 0;
+        frame_counter = 0;
+        current_mosi_bits = 0;
+        frame_period = 13;
+        return;
+      end
+
       // Latch new frame properties only at frame start
-if (bit_counter == 0) begin
-  current_is_read_data = is_read_data;
-  current_period       = current_is_read_data ? 23 : 13;
-  current_mosi_bits    = mosi_bits;   // latch full command frame
-end
-else begin
-  mosi_bits = current_mosi_bits;      // reuse ongoing frame
-end
+      if (frame_counter == 0) begin
+       // Latch frame properties only once per frame
+           current_mosi_bits    = mosi_bits;
+           frame_period         = (mosi_bits [10:8] == 3'b111) ? 23 : 13;
+           bit_counter = 0;
+           SS_n = 1;   // high for 1 cycle at start of new frame
+         end
+       else begin
+      
+        SS_n = 0;   
+        end
 
-// SS_n timing — high for 1 cycle at start of each frame
-    if (bit_counter == 0)
-      SS_n = 1;
-    else
-     SS_n = 0;
+        if ( (13 > frame_counter)  && (frame_counter > 1) ) begin   // first transient to chk_cmd not get values from mosi_bits
+             MOSI = current_mosi_bits[10 - bit_counter];
+             bit_counter = (bit_counter + 1) % 11; 
+        end else begin 
+           MOSI = 0; // idle value
+           bit_counter = 0;
+         end
 
-      // (3) Determine current bit to transmit (MSB first)
-     
-      if (SS_n == 0)
-        MOSI = mosi_bits[10 - bit_counter];
-      else
-        MOSI = 0; // idle value
 
       // (4) tx_valid logic (reinforced for safety)
-      if (mosi_bits[10:8] == 3'b111)
-        tx_valid = 1;
+      if (current_mosi_bits[10:8] == 3'b111 && SS_n == 0 && frame_counter == 13) begin 
+            tx_valid = 1;    // pulse for 1 cycle at bit 13 of READ_DATA frame
+            tx_data = $random; // random data to send
+          end
+          else  begin
+            tx_valid = 0;
+            tx_data  = 0;    // idle value
+          end
 
-      // Increment counters
-      bit_counter++;
-      global_cycle_count++;
+      // --- Increment counters ---
+       frame_counter = (frame_counter + 1) % frame_period; // controls SS_n timing  zero at frame counter = 12
 
-      if (bit_counter == 11)
-        bit_counter = 0; // start next frame
+       // debug 
+       //$display("post_randomize: %s time = %0t frame_counter=%0d bit_counter=%0d current_mosi_bits=%b ",convert2string(), $time, frame_counter, bit_counter , current_mosi_bits);
+      
 
-      // Debug print
-      `uvm_info("POST_RANDOMIZE",
-        $sformatf("Cycle=%0d | Bit=%0d | SS_n=%0b | MOSI=%0b | CMD=%3b | tx_valid=%0b | rst_n=%0b",
-          global_cycle_count, bit_counter, SS_n, MOSI, mosi_bits[10:8], tx_valid, rst_n),
-        UVM_HIGH)
+
     endfunction
 
-    // ============================================
-    // Utility functions
-    // ============================================
-
-    static function void reset_cycle_count();
-      global_cycle_count = 0;
-      bit_counter = 0;
-    endfunction
 
     function string convert2string();
-      return $sformatf("MOSI=%0b SS_n=%0b rst_n=%0b tx_valid=%0b tx_data=0x%0h mosi_bits=%b (cycle=%0d bit=%0d)",
-        MOSI, SS_n, rst_n, tx_valid, tx_data, mosi_bits, global_cycle_count, bit_counter);
+      return $sformatf( " MSIO = %0b SS_n=%0b rst_n=%0b tx_valid=%0b tx_data=0x%0h mosi_bits=%b (cycle=%0d bit=%0d) | rx_data=0x%0h rx_valid=%0b MISO=%0b | GM: rx_data_gm=0x%0h rx_valid_gm=%0b MISO_gm=%0b | cs_sva=%0b cs_sva_gm=%0b |",
+        MOSI, SS_n, rst_n, tx_valid, tx_data, mosi_bits, frame_counter, bit_counter,
+        rx_data, rx_valid, MISO,
+        rx_data_gm, rx_valid_gm, MISO_gm, cs_sva , cs_sva_gm );
     endfunction
 
     function string convert2string_stimulus();
@@ -135,4 +150,4 @@ end
     endfunction
 
   endclass
-endpackage
+endpackage    

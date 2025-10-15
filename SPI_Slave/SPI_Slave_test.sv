@@ -15,6 +15,7 @@ class SPI_Slave_test extends uvm_test;
     SPI_Slave_env env;
     SPI_Slave_config SPI_Slave_cfg;
     virtual SPI_Slave_if SPI_Slave_vif;
+    virtual SPI_gm_if SPI_gm_vif;
     SPI_Slave_main_seq main_seq;
     SPI_Slave_reset_seq reset_seq;
 
@@ -32,7 +33,12 @@ class SPI_Slave_test extends uvm_test;
         if (!uvm_config_db #(virtual SPI_Slave_if)::get(this, "", "SPI_Slave_IF", SPI_Slave_vif))
             `uvm_fatal("build_phase", "Test - Unable to get the virtual interface of the SPI_Slave from the uvm_config_db")
 
+        if (!uvm_config_db #(virtual SPI_gm_if)::get(this, "", "SPI_gm_IF", SPI_gm_vif))
+            `uvm_fatal("build_phase", "Test - Unable to get the virtual interface of the SPI_gm from the uvm_config_db")    
+
         SPI_Slave_cfg.SPI_Slave_vif = SPI_Slave_vif;
+        SPI_Slave_cfg.SPI_gm_vif = SPI_gm_vif;
+        SPI_Slave_cfg.is_active = UVM_ACTIVE;
         uvm_config_db #(SPI_Slave_config)::set(this, "*", "CFG", SPI_Slave_cfg);
     endfunction
 
